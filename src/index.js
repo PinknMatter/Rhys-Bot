@@ -4,8 +4,7 @@ const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
 
-//DISCORD_TOKEN=MTExOTgwMDQ4MDgzNTU4ODExOA.GvUVsV.fVgOxhp3mebYPSnrWiHQL-raOCcWrCm8iMPhFM
-//WEATHERBIT_API_KEY="d002f39c7fc94c76994a2528e6ed5716"
+
 // Modules
 const parseCSV = require('../modules/parse.js');
 const weather = require('../modules/weather.js');
@@ -13,6 +12,7 @@ const rentals = require('../modules/rentals.js');
 const av = require('../modules/rentals.js');
 const createBus = require('../modules/bus.js');
 const tripSend = require('../modules/messagesenders.js');
+const handleBusListCommand = require('../modules/bus.js');
 
 
 

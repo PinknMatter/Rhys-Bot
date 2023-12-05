@@ -3,109 +3,148 @@ const Papa = require('papaparse');
 const axios = require('axios');
 const path = require('path');
 const { MessageActionRow, MessageButton, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const buttonStates = {}; // This will track the state of each button
 
 
 // Function to create a bus list from a CSV file
 async function createBus(message, client) {
- 
-        // Check for "Executives" role
-        const args = message.content.split(' ').slice(1);
+    const args = message.content.split(' ').slice(1);
+    const roleName = "Executives";
+    const member = message.member;
+    const executivesRole = message.guild.roles.cache.find(role => role.name === roleName);
 
-        const roleName = "Executives";
-        const member = message.member;
-        const executivesRole = message.guild.roles.cache.find(role => role.name === roleName);
+    if (!executivesRole || !member.roles.cache.has(executivesRole.id)) {
+        message.channel.send("Sorry, you need to have the 'Executives' role to use this command.");
+        return;
+    }
 
-        if (!executivesRole || !member.roles.cache.has(executivesRole.id)) {
-            message.channel.send("Sorry, you need to have the 'Executives' role to use this command.");
-            return;
+    if (args.length === 0 && message.attachments.size > 0) {
+        // Processing CSV file attachment
+        const attachment = message.attachments.first();
+        try {
+            const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
+            const csvData = response.data.toString('utf8');
+            const parsedData = Papa.parse(csvData, { header: true }).data;
+
+            const busList = parsedData.map(row => ({
+                name: row['Product Form: Ticket Holder\'s Name'] || 'unknown', // Default to 'unknown' if empty or undefined
+                phoneNumber: row['Product Form: Ticket Holder\'s Phone'] || 'unknown',
+                ticketType: row['Lineitem variant'] || 'all',
+                checkedIn: false
+            })).sort((a, b) => {
+                // Handle undefined values in sorting
+                if (!a.name) return 1;  // Push undefined or empty names to the end
+                if (!b.name) return -1;
+                return a.name.localeCompare(b.name);
+            });
+
+            const filename = parsedData[0]['Lineitem name'].split(' ')[0];
+            const folderPath = './BusLists';
+            const filePath = path.join(folderPath, `${filename}.json`);
+
+            if (!fs.existsSync(folderPath)) {
+                fs.mkdirSync(folderPath);
+            }
+
+            fs.writeFileSync(filePath, JSON.stringify(busList, null, 2));
+            message.channel.send(`Bus list created: ${filename}.json with ${busList.length} names.`);
+        } catch (error) {
+            console.error('Error processing the CSV file:', error);
+            message.channel.send('There was an error processing the CSV file.');
         }
-        if (args.length === 0) {
-        // Check if the message has an attachment
-        if (message.attachments.size > 0) {
-            const attachment = message.attachments.first();
-            try {
-                // Download the CSV file
-                const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
-                const csvData = response.data.toString('utf8');
-
-                // Parse the CSV data
-                const parsedData = Papa.parse(csvData, { header: true }).data;
-
-                // Filter data for rows containing 'bus' in 'Lineitem Variant' and create a list
-                const busList = parsedData
-                .filter(row => row['Lineitem variant'] && row['Lineitem variant'].toLowerCase().includes('bus'))
-                .map(row => ({
-                    name: row['Billing Name'],
-                    checkedIn: false
-                }));
-
-                const count = busList.length; // Count of names added to the JSON
-
-
-                // Extract the first word from "Lineitem name" for the filename
-                const filename = parsedData[0]['Lineitem name'].split(' ')[0];
-
-                // Define the folder and file path
-                const folderPath = './BusLists';
-                const filePath = path.join(folderPath, `${filename}.json`);
-
-                // Create the folder if it doesn't exist
-                if (!fs.existsSync(folderPath)) {
-                    fs.mkdirSync(folderPath);
+    } else if (args.length > 0) {
+        
+        if (args[0].toLowerCase() === 'list') {
+            const folderPath = './BusLists';
+            fs.readdir(folderPath, (err, files) => {
+                if (err) {
+                    message.channel.send('Error reading the directory.');
+                    console.error('Directory read error:', err);
+                    return;
                 }
-
-                // Write the data to a JSON file in the specified folder
-                fs.writeFileSync(filePath, JSON.stringify(busList, null, 2));
-
-                // Respond to the user
-                message.channel.send(`Bus list created: ${filename}.json with ${count} names.`);
-            } catch (error) {
-                console.error('Error processing the CSV file:', error);
-                message.channel.send('There was an error processing the CSV file.');
+                const jsonFiles = files.filter(file => file.endsWith('.json'));
+                const fileListMessage = jsonFiles.length > 0 ? jsonFiles.join('\n') : 'No bus lists found.';
+                message.channel.send(`Available Bus Lists:\n${fileListMessage}`);
+            });
+        }
+        // Handling !buslist command with filtering
+       
+        const filename = args.length > 0 ? args[0] : null;
+        let filterType;
+        
+        if (args.length > 1) {
+            const filterArg = args[1].toLowerCase();
+            if (filterArg === 'to') {
+                filterType = 'Lift Ticket Only';
+            } else if (filterArg === 'all') {
+                filterType = 'all'; // Add 'all' as a filter option
+            } else {
+                filterType = 'bus';
             }
         } else {
-            message.channel.send('Please attach a CSV file with the command.');
+            filterType = 'bus'; // Default to 'bus' if no second argument
         }
-    } else {
-        // Display the existing list with buttons
-        const filename = args[0] + '.json';
-        const filePath = path.join(__dirname, '..', 'BusLists', filename);
+
+
+        const filePath = path.join(__dirname, '..', 'BusLists', `${filename}.json`);
 
         if (fs.existsSync(filePath)) {
             const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            
-            data.forEach( async (person, index) => {
-             
-              
-                const confirm = new ButtonBuilder()                       
-                            .setCustomId(`checkin-${index}`)
-                            .setLabel('Check-in')
-                            .setStyle(ButtonStyle.Primary)
-                    
-                            
-                            const row = new ActionRowBuilder().addComponents(confirm);
-                            message.channel.send({ content: `${person.name}`, components: [row] });
-                          
+            const filteredData = filterType === 'all' ? data : data.filter(person =>
+                person.ticketType && person.ticketType.toLowerCase().includes(filterType.toLowerCase())
+            );           
+             console.log('Filter Type:', filterType);
 
-                                
-                           
-                        });
+            filteredData.forEach(async (person, index) => {
+                console.log(person);
+                const confirm = new ButtonBuilder()
+                    .setCustomId(`checkin-${index}`)
+                    .setLabel('Check-in')
+                    .setStyle(ButtonStyle.Primary);
 
-                         
+                const row = new ActionRowBuilder().addComponents(confirm);
+                message.channel.send({ content: `${person.name} - ${person.phoneNumber}`, components: [row] });
+                
+            });
+            message.channel.send(`Displayed ${filteredData.length} entries.`);
 
-                        client.on('interactionCreate', async (interaction) => {
+                            client.on('interactionCreate', async (interaction) => {
                             if (!interaction.isButton()) return;
                             if (!interaction.customId.startsWith('checkin-')) return;
+                        
+                            const customId = interaction.customId;
+                        
+                            // Determine the new state based on the current state
+                            const currentState = buttonStates[customId] || 'initial';
+                            let newState;
+                            let newLabel;
+                            let newStyle;
+                        
+                            if (currentState === 'initial') {
+                                newState = 'danger';
+                                newLabel = 'Checked-in';
+                                newStyle = ButtonStyle.Danger;
+                            } else if (currentState === 'danger') {
+                                newState = 'success';
+                                newLabel = 'On The Bus!';
+                                newStyle = ButtonStyle.Success;
+                            } else if (currentState === 'success') {
+                                newState = 'initial';
+                                newLabel = 'Check-in';
+                                newStyle = ButtonStyle.Primary;
+                            }
+                        
+                            // Update the button state
+                            buttonStates[customId] = newState;
                         
                             // Clone the existing components and create new instances
                             const components = interaction.message.components.map(component => {
                                 const row = new ActionRowBuilder();
                                 component.components.forEach(button => {
                                     const newButton = ButtonBuilder.from(button);
-                                    if (newButton.data.custom_id === interaction.customId) {
-                                        newButton.setStyle(ButtonStyle.Success)
-                                                 .setLabel('Checked!')
-                                                 .setDisabled(true);
+                                    if (newButton.data.custom_id === customId) {
+                                        newButton.setStyle(newStyle)
+                                                 .setLabel(newLabel);
                                     }
                                     row.addComponents(newButton);
                                 });
@@ -118,57 +157,16 @@ async function createBus(message, client) {
                                 components: components
                             });
                         });
-                            // if (!interaction.isButton()) return;
-                        
-                            // const customId = interaction.customId;
-                            // if (!customId.startsWith('checkin-')) return;
-                        
-                            // // Extracting the index from the custom ID
-                            // const index = parseInt(customId.split('-')[1], 10);
-                            // const personName = interaction.message.content; // Name is in the message content
-                        
-                            // Define the JSON file path
-                            // Assuming the filename is stored somewhere accessible, like in client or interaction
-                            // const filename = 'Mont-Tremblant.json'; // Replace with actual logic to get filename
-                            // const filePath = path.join(__dirname, '..', 'BusLists', filename);
-                        
-                            // if (fs.existsSync(filePath)) {
-                            //     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-                        
-                            //     // Find the person in the data and update their checked-in status
-                            //     const person = data.find(p => p.name === personName);
-                            //     if (person) {
-                            //         person.checkedIn = true;
-                            //         fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-                        
-                            //         // Update the button to show checked-in status
-                            //         await interaction.update({ 
-                            //             content: `${personName} is now checked in.`,
-                            //             components: [] // Remove the button or update as needed
-                            //         });
-                            //     } else {
-                            //         // Handle case where person is not found (optional)
-                            //         await interaction.reply({ content: 'Person not found in the list.', ephemeral: true });
-                            //     }
-                            // } else {
-                            //     // File not found handling
-                            //     await interaction.reply({ content: 'List file not found.', ephemeral: true });
-                            // }
-                 
-                    
 
-             
-                     
-             
-         
+
+
         } else {
             message.channel.send('File not found.');
         }
     }
-
-    
 }
 
+     
 
 // Export the function for use in your bot
 module.exports = createBus;

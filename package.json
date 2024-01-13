@@ -16,5 +16,8 @@
     "dotenv": "^16.3.1",
     "fs": "^0.0.1-security",
     "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "@flydotio/dockerfile": "^0.5.0"
   }
 }

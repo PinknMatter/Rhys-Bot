@@ -1,5 +1,5 @@
 // General Imports
-const { Client, IntentsBitField } = require('discord.js');
+const { Client, IntentsBitField, SlashCommandBuilder, Collection} = require('discord.js');
 const dotenv = require('dotenv');
 const path = require('path');
 const fs = require('fs');
@@ -20,15 +20,44 @@ dotenv.config();
 
 const client = new Client({
     intents: [
-        IntentsBitField.Flags.Guilds,
-        IntentsBitField.Flags.GuildMessages,
-        IntentsBitField.Flags.MessageContent,
+        3242773
     ]
 })
 
 client.on('ready', () => {
     console.log(`Bot is ready as: ${client.user.tag}`);
 })
+
+
+//Commands Handler
+client.commands = new Collection();
+const commandFiles = fs.readdirSync(path.join(__dirname, '..', 'commands')).filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+    const command = require(`../commands/${file}`);
+    client.commands.set(command.data.name, command);
+}
+
+//Events Handler
+const eventFiles = fs.readdirSync('./events').filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+    const event = require(`../events/${file}`);
+    if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args, client));
+    } else {
+        client.on(event.name, (...args) => event.execute(...args, client));
+    }
+}
+
+
+
+
+
+
+
+
+
 
 client.on('messageCreate', async (message) => {
 
@@ -71,11 +100,13 @@ client.on('messageCreate', async (message) => {
         await tripSend(message,);
     }
 
+
+});
     
 
 
 
-});
+
 
 // client.on('interactionCreate', async (interaction) => {
     
@@ -109,5 +140,5 @@ client.on('messageCreate', async (message) => {
 
 const PREFIX = '!';
 
-client.login(process.env.DISCORD_TOKEN);
+client.login("MTExOTgwMDQ4MDgzNTU4ODExOA.GvUVsV.fVgOxhp3mebYPSnrWiHQL-raOCcWrCm8iMPhFM");
 

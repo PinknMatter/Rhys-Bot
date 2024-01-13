@@ -1,43 +1,69 @@
-const { EmbedBuilder, Events, GatewayIntentBits } = require('discord.js');
 
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-async function tripSend(message, client) {
-    message.react('👍').then(() => message.react('👎'));
+async function tripSend(interaction, client) {
+    // Define the trips
+    const trips = [
+        { name: "Mont-Tremblant", emoji: "🏖️" },
+        { name: "Quebec City", emoji: "🏔️" },
+        { name: "Bromont", emoji: "🏞" },
+        { name: "Jay-Peak", emoji: "🚀" },
+        { name: "Saint-Sauveur", emoji: "🌨" },
+    ];
 
-   
-    message.awaitReactions({max: 1, time: 60000, errors: ['time'] })
-        
-  
-        const trips = [
-            { name: "Mont-Tremblant, Dec 3rd", emoji: "🏖️" },
-            { name: "QC Weekender", emoji: "🏔️" },
-            // Add more trips here
-        ];
-    
-        const embed = new EmbedBuilder()
-            .setTitle("Upcoming Trips")
-            .setDescription("React with the emoji corresponding to the trip you're interested in!");
-    
-        trips.forEach(trip => {
-            embed.addFields({ name: trip.name, value: trip.emoji, inline: true });
-        });
-    
-        const tripMessage = await message.channel.send({ embeds: [embed] });
-    
+    // Create the embed
+    const embed = new EmbedBuilder()
+        .setTitle("Upcoming Trips")
+        .setDescription("React with the emoji corresponding to the mountain you're interested in!");
+
+    // Add trips to the embed
+    trips.forEach(trip => {
+        embed.addFields({ name: trip.name, value: trip.emoji, inline: true });
+    });
+
+    // Send the embed in an interaction reply
+    await interaction.reply({ embeds: [embed], fetchReply: true }).then(sentMessage => {
         for (const trip of trips) {
-            await tripMessage.react(trip.emoji);
+            sentMessage.react(trip.emoji);
         }
-    
+
+        // Reaction collector
         const filter = (reaction, user) => {
             return trips.some(trip => trip.emoji === reaction.emoji.name) && !user.bot;
         };
-    
-        const collector = tripMessage.createReactionCollector({ filter });
-    
-        collector.on('collect', (reaction, user) => {
+
+        const collector = sentMessage.createReactionCollector({ filter, dispose: true });
+
+        collector.on('collect', async (reaction, user) => {
             const trip = trips.find(trip => trip.emoji === reaction.emoji.name);
-            message.channel.send(`${user.tag} reacted with ${reaction.emoji.name} and is interested in "${trip.name}"`);
+            if (!trip) return;
+
+            const role = interaction.guild.roles.cache.find(r => r.name === trip.name);
+            if (!role) {
+                console.log(`Role not found: ${trip.name}`);
+                return;
+            }
+
+            const member = await interaction.guild.members.fetch(user.id);
+            member.roles.add(role);
+           console.log(`${user} added to "${trip.name}" channel.`);
         });
+
+        collector.on('remove', async (reaction, user) => {
+            const trip = trips.find(trip => trip.emoji === reaction.emoji.name);
+            if (!trip) return;
+
+            const role = interaction.guild.roles.cache.find(r => r.name === trip.name);
+            if (!role) {
+                console.log(`Role not found: ${trip.name}`);
+                return;
+            }
+
+            const member = await interaction.guild.members.fetch(user.id);
+            member.roles.remove(role);
+           console.log(`${user} removed from "${trip.name}" channel.`);
+        });
+    });
 }
 
 module.exports = tripSend;

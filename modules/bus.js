@@ -70,43 +70,49 @@ async function createBus(message, client) {
         // Handling !buslist command with filtering
        
         const filename = args.length > 0 ? args[0] : null;
-        let filterType;
-        
-        if (args.length > 1) {
-            const filterArg = args[1].toLowerCase();
-            if (filterArg === 'to') {
-                filterType = 'Lift Ticket Only';
-            } else if (filterArg === 'all') {
-                filterType = 'all'; // Add 'all' as a filter option
-            } else {
-                filterType = 'bus';
-            }
-        } else {
-            filterType = 'bus'; // Default to 'bus' if no second argument
-        }
-
-
         const filePath = path.join(__dirname, '..', 'BusLists', `${filename}.json`);
-
+        
         if (fs.existsSync(filePath)) {
             const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-            const filteredData = filterType === 'all' ? data : data.filter(person =>
-                person.ticketType && person.ticketType.toLowerCase().includes(filterType.toLowerCase())
-            );           
-             console.log('Filter Type:', filterType);
-
-            filteredData.forEach(async (person, index) => {
-                console.log(person);
-                const confirm = new ButtonBuilder()
-                    .setCustomId(`checkin-${index}`)
-                    .setLabel('Check-in')
-                    .setStyle(ButtonStyle.Primary);
-
-                const row = new ActionRowBuilder().addComponents(confirm);
-                message.channel.send({ content: `${person.name} - ${person.phoneNumber}`, components: [row] });
-                
-            });
-            message.channel.send(`Displayed ${filteredData.length} entries.`);
+        
+            // Filter for 'bus'
+            const busList = data.filter(person => 
+                person.ticketType && person.ticketType.toLowerCase().includes('bus')
+            );
+        
+            // Filter for 'Lift Ticket Only'
+            const ticketOnlyList = data.filter(person => 
+                person.ticketType && person.ticketType.toLowerCase().includes('lift ticket only')
+            );
+        
+            // Send 'bus' list
+            if (busList.length > 0) {
+                await message.channel.send('**Bus List:**');
+                for (const [index, person] of busList.entries()) {
+                    const confirm = new ButtonBuilder()
+                        .setCustomId(`checkin-bus-${index}`)
+                        .setLabel('Check-in')
+                        .setStyle(ButtonStyle.Primary);
+        
+                    const row = new ActionRowBuilder().addComponents(confirm);
+                    await message.channel.send({ content: `${person.name} - ${person.phoneNumber}`, components: [row] });
+                }
+            }
+        
+            // Send 'Lift Ticket Only' list
+            if (ticketOnlyList.length > 0) {
+                await message.channel.send('**Lift Ticket Only List:**');
+                for (const [index, person] of ticketOnlyList.entries()) {
+                    const confirm = new ButtonBuilder()
+                        .setCustomId(`checkin-ticket-only-${index}`)
+                        .setLabel('Check-in')
+                        .setStyle(ButtonStyle.Secondary);
+        
+                    const row = new ActionRowBuilder().addComponents(confirm);
+                    await message.channel.send({ content: `${person.name} - ${person.phoneNumber}`, components: [row] });
+                }
+            }
+      
 
                             client.on('interactionCreate', async (interaction) => {
                             if (!interaction.isButton()) return;

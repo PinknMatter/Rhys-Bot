@@ -26,7 +26,18 @@
                 const csvData = fs.readFileSync(filePath, 'utf8');
                 
                 // Parse the CSV file using PapaParse
-                const parsedData = Papa.parse(csvData, { header: true }).data;
+                let parsedData = Papa.parse(csvData, { header: true }).data;
+
+                const originalRowCount = parsedData.length;
+
+                parsedData = parsedData.filter(row => {
+                    const amountRefunded = parseFloat(row['Amount Refunded']);
+                    return isNaN(amountRefunded) || amountRefunded <= 0;
+                    
+                });
+
+                const removedRowCount = originalRowCount - parsedData.length;
+                 console.log(`Rows removed due to refund: ${removedRowCount}`);
 
                 // Check if all "Lineitem variant" fields are empty
                 const allVariantsEmpty = parsedData.every(row => {

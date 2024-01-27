@@ -13,6 +13,7 @@ const av = require('../modules/rentals.js');
 const createBus = require('../modules/bus.js');
 const tripSend = require('../modules/messagesenders.js');
 const handleBusListCommand = require('../modules/bus.js');
+const handleBusEvent = require('../events/busEvents.js');
 
 
 
@@ -102,7 +103,13 @@ client.on('messageCreate', async (message) => {
 
 
 });
-    
+
+client.on('interactionCreate', async interaction => {
+    // Handle bus list button interactions
+    handleBusEvent(interaction);
+
+    // You can add other interaction handlers here as needed
+});
 
 
 

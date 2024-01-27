@@ -11,7 +11,7 @@ const executeRaffleCommand = async (interaction) => {
             await interaction.reply({ content: 'You have already entered the raffle.', ephemeral: true });
         } else {
             raffleEntries.add(username);
-            await interaction.reply({ content: `${username} has entered the raffle!`, ephemeral: true });
+            await interaction.reply({ content: `${username} has entered the raffle!`});
         }
     }   else if (interaction.options.getSubcommand() === 'draw') {
         if (!hasExecutivesRole(interaction.member)) {
